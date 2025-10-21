@@ -63,6 +63,31 @@ class ApiResponse:
     timestamp: str = None
 
 
+@dataclass
+class ChatCustomization:
+    """Chat customization parameters"""
+    author_name: Optional[str] = None
+    language: Optional[str] = None
+    personality: Optional[str] = None
+    teaching_style: Optional[str] = None
+    branding: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class EnhancedChatCompletionRequest:
+    """Enhanced chat completion request with customization"""
+    history: List[Dict[str, str]]
+    input_text: str
+    subject: Optional[str] = None
+    topic: Optional[str] = None
+    preset: Optional[str] = None
+    author_name: Optional[str] = None
+    language: Optional[str] = None
+    personality: Optional[str] = None
+    teaching_style: Optional[str] = None
+    branding: Optional[Dict[str, Any]] = None
+
+
 # Exception classes
 class HenotaceError(Exception):
     """Base exception for Henotace API errors"""
@@ -184,3 +209,26 @@ class TutorInit:
     subject: Optional[SessionSubject] = None
     grade_level: Optional[str] = None
     language: Optional[str] = None
+
+
+@dataclass
+class ClassworkQuestion:
+    """Individual classwork question"""
+    question: str
+    type: str = "multiple_choice"  # multiple_choice, short_answer, essay, etc.
+    options: Optional[List[str]] = None
+    correct_answer: Optional[str] = None
+    explanation: Optional[str] = None
+    difficulty: str = "medium"
+    points: Optional[int] = None
+
+
+@dataclass
+class ClassworkResponse:
+    """Classwork generation response"""
+    questions: List[ClassworkQuestion]
+    metadata: Dict[str, Any]
+    subject: Optional[str] = None
+    topic: Optional[str] = None
+    difficulty: str = "medium"
+    question_count: int = 5

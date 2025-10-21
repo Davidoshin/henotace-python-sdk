@@ -8,7 +8,7 @@ from .tutor import Tutor, create_tutor
 from .types import (
     SessionStudent, SessionTutor, SessionChat, SessionSubject,
     HenotaceError, HenotaceAPIError, HenotaceNetworkError,
-    StorageConnector, Logger, LogLevel
+    StorageConnector, Logger, LogLevel, ClassworkQuestion, ClassworkResponse
 )
 from .connectors import InMemoryConnector
 from .logger import ConsoleLogger, NoOpLogger, create_logger
@@ -19,10 +19,11 @@ __all__ = [
     'StorageConnector', 'InMemoryConnector',
     'SessionStudent', 'SessionTutor', 'SessionChat', 'SessionSubject',
     'HenotaceError', 'HenotaceAPIError', 'HenotaceNetworkError',
-    'Logger', 'LogLevel', 'ConsoleLogger', 'NoOpLogger', 'create_logger'
+    'Logger', 'LogLevel', 'ConsoleLogger', 'NoOpLogger', 'create_logger',
+    'ClassworkQuestion', 'ClassworkResponse'
 ]
 
 # Version info
-__version__ = '1.0.1'
+__version__ = '1.1.2'
 __author__ = 'Henotace AI Team'
 __email__ = 'support@henotace.ai'

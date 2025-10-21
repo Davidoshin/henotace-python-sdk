@@ -50,7 +50,7 @@ class HenotaceAI:
         self.storage = storage
         
         # Default configuration
-        self.default_persona = default_persona
+        self.default_persona = default_persona or "You are a helpful and patient tutor. Give short, concise, and easy-to-understand explanations by default. Only provide detailed or lengthy explanations when the user specifically asks for more information, more detail, or a longer explanation. Start simple and build up complexity only when requested."
         self.default_preset = default_preset
         self.default_user_profile = default_user_profile
         self.default_metadata = default_metadata
@@ -72,8 +72,8 @@ class HenotaceAI:
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json',
-            'X-API-Key': self.api_key,
-            'User-Agent': 'henotace-python-sdk/1.0.1'
+            'Authorization': f'Bearer {self.api_key}',
+            'User-Agent': 'henotace-python-sdk/1.2.0'
         })
 
     def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
@@ -203,12 +203,60 @@ class HenotaceAI:
         """
         try:
             status = self.get_status()
-            return status.get('success', False) and status.get('data', {}).get('status') == 'ok'
+            return status.get('success', False) and status.get('data', {}).get('status') in ['ok', 'operational']
         except:
             return False
 
+    def _detect_verbosity(self, input_text: str) -> str:
+        """
+        Auto-detect verbosity level from user input
+        
+        Args:
+            input_text: User's input message
+            
+        Returns:
+            Verbosity level: 'brief', 'normal', 'detailed', or 'comprehensive'
+        """
+        input_lower = input_text.lower()
+        
+        # Keywords that indicate different verbosity levels
+        brief_keywords = [
+            'brief', 'short', 'quick', 'simple', 'concise', 'summary', 
+            'just', 'only', 'basics', 'main points', 'key points'
+        ]
+        
+        detailed_keywords = [
+            'detailed', 'comprehensive', 'thorough', 'complete', 'full', 
+            'explain more', 'more information', 'elaborate', 'expand',
+            'in depth', 'deep dive', 'everything about', 'all about'
+        ]
+        
+        comprehensive_keywords = [
+            'comprehensive', 'complete', 'everything', 'all details',
+            'step by step', 'from scratch', 'beginner to advanced',
+            'full explanation', 'comprehensive guide'
+        ]
+        
+        # Check for comprehensive keywords first (most specific)
+        if any(keyword in input_lower for keyword in comprehensive_keywords):
+            return 'comprehensive'
+        
+        # Check for detailed keywords
+        if any(keyword in input_lower for keyword in detailed_keywords):
+            return 'detailed'
+        
+        # Check for brief keywords
+        if any(keyword in input_lower for keyword in brief_keywords):
+            return 'brief'
+        
+        # Default to normal verbosity
+        return 'normal'
+
     def complete_chat(self, history: List[Dict[str, str]], input_text: str, 
-                     preset: str = None) -> Dict[str, str]:
+                     preset: str = None, subject: str = None, topic: str = None, 
+                     verbosity: str = None, author_name: str = None, language: str = None,
+                     personality: str = None, teaching_style: str = None, 
+                     branding: Dict[str, Any] = None) -> Dict[str, str]:
         """
         Send a chat completion request to the API
         
@@ -216,6 +264,14 @@ class HenotaceAI:
             history: List of conversation history messages
             input_text: User's input message
             preset: AI behavior preset (default: 'tutor_default')
+            subject: Subject for the conversation (default: 'general')
+            topic: Topic for the conversation (default: 'general')
+            verbosity: Response verbosity level ('brief', 'normal', 'detailed', 'comprehensive')
+            author_name: Author name for personalization
+            language: Response language (default: 'en')
+            personality: AI personality ('friendly', 'professional', 'encouraging', 'direct')
+            teaching_style: Teaching approach ('socratic', 'direct', 'problem-based')
+            branding: Custom branding information
             
         Returns:
             Dictionary containing the AI response
@@ -223,10 +279,53 @@ class HenotaceAI:
         if preset is None:
             preset = self.default_preset
         
+        # Convert history to the format expected by the API (matching Node.js SDK)
+        chat_history = []
+        for msg in history:
+            if isinstance(msg, dict):
+                if 'role' in msg and 'content' in msg:
+                    # Convert from {role: 'user'|'assistant', content: '...'} format
+                    sender = 'student' if msg['role'] == 'user' else 'tutor'
+                    chat_history.append({
+                        'sender': sender,
+                        'message': msg['content']
+                    })
+                elif 'sender' in msg and 'message' in msg:
+                    # Already in correct format
+                    chat_history.append(msg)
+                else:
+                    # Fallback for other formats
+                    chat_history.append({
+                        'sender': 'student',
+                        'message': str(msg)
+                    })
+            else:
+                # Fallback for non-dict messages
+                chat_history.append({
+                    'sender': 'student',
+                    'message': str(msg)
+                })
+        
+        # Auto-detect verbosity from user input if not specified
+        if verbosity is None:
+            verbosity = self._detect_verbosity(input_text)
+        
+        # For now, include verbosity in the preset to work with current backend
+        if verbosity != 'normal':
+            preset = f"{preset}_verbosity_{verbosity}"
+        
         payload = {
-            'history': history,
+            'history': chat_history,
             'input': input_text,
-            'preset': preset
+            'subject': subject or 'general',
+            'topic': topic or 'general',
+            'preset': preset,
+            # New customization parameters
+            'author_name': author_name,
+            'language': language or 'en',
+            'personality': personality or 'friendly',
+            'teaching_style': teaching_style or 'socratic',
+            'branding': branding or {}
         }
         
         try:
@@ -252,6 +351,164 @@ class HenotaceAI:
         except requests.exceptions.RequestException as e:
             self.logger.error('Chat completion failed', {
                 'input': input_text,
+                'error': str(e)
+            })
+            raise
+
+    def chat_completion(self, history: List[Dict[str, str]], input_text: str, 
+                       subject: str = None, topic: str = None, preset: str = None,
+                       author_name: str = None, language: str = None,
+                       personality: str = None, teaching_style: str = None, 
+                       branding: Dict[str, Any] = None) -> Dict[str, str]:
+        """
+        Enhanced chat completion with customization parameters
+        
+        Args:
+            history: List of conversation history messages
+            input_text: User's input message
+            subject: Subject for the conversation (default: 'general')
+            topic: Topic for the conversation (default: 'general')
+            preset: AI behavior preset (default: 'tutor_default')
+            author_name: Author name for personalization
+            language: Response language (default: 'en')
+            personality: AI personality ('friendly', 'professional', 'encouraging', 'direct')
+            teaching_style: Teaching approach ('socratic', 'direct', 'problem-based')
+            branding: Custom branding information
+            
+        Returns:
+            Dictionary containing the AI response
+        """
+        self.logger.debug('Enhanced chat completion', {
+            'inputLength': len(input_text),
+            'historyLength': len(history),
+            'subject': subject,
+            'topic': topic,
+            'author_name': author_name,
+            'language': language,
+            'personality': personality,
+            'teaching_style': teaching_style,
+            'hasBranding': bool(branding)
+        })
+        
+        return self.complete_chat(
+            history=history,
+            input_text=input_text,
+            subject=subject,
+            topic=topic,
+            preset=preset,
+            author_name=author_name,
+            language=language,
+            personality=personality,
+            teaching_style=teaching_style,
+            branding=branding
+        )
+
+    def generate_classwork(self, history: List[Dict[str, str]], subject: str = None, 
+                          topic: str = None, question_count: int = 5, 
+                          difficulty: str = 'medium') -> Dict[str, Any]:
+        """
+        Generate classwork questions based on conversation history
+        
+        Args:
+            history: List of conversation history messages
+            subject: Subject for the classwork (default: 'general')
+            topic: Topic for the classwork (default: 'general')
+            question_count: Number of questions to generate (default: 5)
+            difficulty: Difficulty level ('easy', 'medium', 'hard') (default: 'medium')
+            
+        Returns:
+            Dictionary containing the generated classwork
+        """
+        # Convert history to the format expected by the API
+        chat_history = []
+        for msg in history:
+            if isinstance(msg, dict):
+                if 'role' in msg and 'content' in msg:
+                    # Convert from {role: 'user'|'assistant', content: '...'} format
+                    sender = 'student' if msg['role'] == 'user' else 'tutor'
+                    chat_history.append({
+                        'sender': sender,
+                        'message': msg['content']
+                    })
+                elif 'sender' in msg and 'message' in msg:
+                    # Already in correct format
+                    chat_history.append(msg)
+                else:
+                    # Fallback for other formats
+                    chat_history.append({
+                        'sender': 'student',
+                        'message': str(msg)
+                    })
+            else:
+                # Fallback for non-dict messages
+                chat_history.append({
+                    'sender': 'student',
+                    'message': str(msg)
+                })
+        
+        payload = {
+            'history': chat_history,
+            'input': f'Generate {question_count} {difficulty} difficulty questions about {topic or "the topic we discussed"}',
+            'subject': subject or 'general',
+            'topic': topic or 'general',
+            'preset': 'tutor_default',
+            'generate_classwork': True,
+            'question_count': question_count,
+            'difficulty': difficulty
+        }
+        
+        try:
+            self.logger.debug('Starting classwork generation', {
+                'historyLength': len(history),
+                'questionCount': question_count,
+                'difficulty': difficulty,
+                'subject': subject,
+                'topic': topic
+            })
+            
+            response = self._make_request(
+                'POST', 
+                '/api/external/working/chat/completion/',
+                json=payload
+            )
+            data = self._handle_response(response)
+            
+            # Parse classwork response
+            ai_response = data.get('data', {}).get('ai_response', '')
+            
+            # Try to parse as JSON if it's a classwork response
+            try:
+                classwork_data = json.loads(ai_response)
+                if isinstance(classwork_data, dict) and 'questions' in classwork_data:
+                    self.logger.info('Classwork generation successful', {
+                        'questionCount': len(classwork_data.get('questions', [])),
+                        'difficulty': difficulty
+                    })
+                    return classwork_data
+            except json.JSONDecodeError:
+                pass
+            
+            # Fallback: return as text response
+            self.logger.info('Classwork generation successful (text format)', {
+                'responseLength': len(ai_response)
+            })
+            
+            return {
+                'questions': [{'question': ai_response, 'type': 'text'}],
+                'metadata': {
+                    'question_count': question_count,
+                    'difficulty': difficulty,
+                    'subject': subject,
+                    'topic': topic,
+                    'format': 'text'
+                }
+            }
+            
+        except requests.exceptions.RequestException as e:
+            self.logger.error('Classwork generation failed', {
+                'historyLength': len(history),
+                'questionCount': question_count,
+                'difficulty': difficulty,
                 'error': str(e)
             })
             raise

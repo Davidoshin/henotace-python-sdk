@@ -1,3 +1,49 @@
+Metadata-Version: 2.4
+Name: henotace-ai-sdk
+Version: 1.2.0
+Summary: Official Python SDK for the Henotace AI API
+Home-page: https://github.com/Davidoshin/henotace-python-sdk
+Author: Henotace AI Team
+Author-email: support@henotace.ai
+Project-URL: Bug Reports, https://github.com/Davidoshin/henotace-python-sdk/issues
+Project-URL: Source, https://github.com/Davidoshin/henotace-python-sdk
+Project-URL: Documentation, https://docs.henotace.ai/python-sdk
+Keywords: ai,tutor,education,api,sdk
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+Requires-Dist: requests>=2.25.0
+Requires-Dist: dataclasses; python_version < "3.7"
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
+Requires-Dist: pytest-asyncio; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: flake8; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: project-url
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
 # Henotace AI Python SDK
 
 Official Python SDK for the Henotace AI API - your gateway to AI-powered tutoring and educational assistance.

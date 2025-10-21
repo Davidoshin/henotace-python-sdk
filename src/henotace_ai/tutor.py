@@ -19,7 +19,7 @@ class Tutor:
     """
     
     def __init__(self, sdk: HenotaceAI, student_id: str, tutor_id: str, 
-                 storage: Optional[StorageConnector] = None):
+                 storage: Optional[StorageConnector] = None, subject: str = None, topic: str = None):
         self.sdk = sdk
         self.student_id = student_id
         self.tutor_id = tutor_id
@@ -30,6 +30,8 @@ class Tutor:
         self.persona = None
         self.user_profile = None
         self.metadata = None
+        self.subject = subject or 'general'
+        self.topic = topic or 'general'
         
         # Compression settings
         self.compression = {
@@ -176,7 +178,9 @@ class Tutor:
         self.storage.replace_chats(self.student_id, self.tutor_id, recent_chats)
     
     async def send(self, message: str, context: Optional[Union[str, List[str]]] = None, 
-                  preset: Optional[str] = None) -> str:
+                  preset: Optional[str] = None, author_name: Optional[str] = None,
+                  language: Optional[str] = None, personality: Optional[str] = None,
+                  teaching_style: Optional[str] = None, branding: Optional[Dict[str, Any]] = None) -> str:
         """
         Send a message to the tutor and get AI response
         
@@ -184,6 +188,11 @@ class Tutor:
             message: User's message
             context: Optional ephemeral context
             preset: Optional AI preset
+            author_name: Author name for personalization
+            language: Response language (default: 'en')
+            personality: AI personality ('friendly', 'professional', 'encouraging', 'direct')
+            teaching_style: Teaching approach ('socratic', 'direct', 'problem-based')
+            branding: Custom branding information
             
         Returns:
             AI response text
@@ -236,7 +245,16 @@ class Tutor:
         completion = self.sdk.complete_chat(
             history=history,
             input_text=message,
-            preset=preset or sdk_config.get('default_preset', 'tutor_default')
+            preset=preset or sdk_config.get('default_preset', 'tutor_default'),
+            subject=self.subject,
+            topic=self.topic,
+            verbosity=None,  # Auto-detect from message
+            # Pass through customization parameters
+            author_name=author_name,
+            language=language,
+            personality=personality,
+            teaching_style=teaching_style,
+            branding=branding
         )
         
         ai_response = completion.get('ai_response', '')
@@ -258,6 +276,51 @@ class Tutor:
                 self.storage.append_chat(self.student_id, self.tutor_id, ai_chat)
         
         return ai_response
+    
+    async def generate_classwork(self, question_count: int = 5, difficulty: str = 'medium') -> Dict[str, Any]:
+        """
+        Generate classwork questions based on the current conversation history
+        
+        Args:
+            question_count: Number of questions to generate (default: 5)
+            difficulty: Difficulty level ('easy', 'medium', 'hard') (default: 'medium')
+            
+        Returns:
+            Dictionary containing the generated classwork
+        """
+        self.logger.debug('Tutor generating classwork', {
+            'studentId': self.student_id,
+            'tutorId': self.tutor_id,
+            'questionCount': question_count,
+            'difficulty': difficulty
+        })
+        
+        # Build history from storage
+        history = []
+        if self.storage:
+            chats = self.storage.list_chats(self.student_id, self.tutor_id)
+            history = [
+                {'role': 'assistant' if chat.is_reply else 'user', 'content': chat.message}
+                for chat in chats
+            ]
+        
+        # Generate classwork using the SDK
+        classwork = self.sdk.generate_classwork(
+            history=history,
+            subject=self.subject,
+            topic=self.topic,
+            question_count=question_count,
+            difficulty=difficulty
+        )
+        
+        self.logger.info('Tutor classwork generated', {
+            'studentId': self.student_id,
+            'tutorId': self.tutor_id,
+            'questionCount': len(classwork.get('questions', [])),
+            'difficulty': difficulty
+        })
+        
+        return classwork
     
     def history(self) -> List[SessionChat]:
         """Get chat history for this tutor"""
@@ -316,7 +379,14 @@ async def create_tutor(sdk: HenotaceAI, student_id: str, tutor_name: str = None,
         logger.warn('Failed to initialize storage', {'error': str(e)})
     
     # Create tutor instance
-    tutor = Tutor(sdk, student_id, tutor_id, storage)
+    tutor = Tutor(
+        sdk, 
+        student_id, 
+        tutor_id, 
+        storage,
+        subject=subject.name if subject else 'general',
+        topic=subject.topic if subject else 'general'
+    )
     
     # Load any previously saved context
     try:
